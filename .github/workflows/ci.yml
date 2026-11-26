@@ -1,0 +1,21 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - run: python3 -m py_compile scripts/review.py
+      - run: python3 -m unittest discover -s tests
+      # API を呼ばずに、プロンプトを組み立てられること
+      - run: git diff --no-index /dev/null README.md > /tmp/sample.diff || true
+      - run: python3 scripts/review.py --dry-run --diff-file /tmp/sample.diff > /dev/null
+      - run: ruby -ryaml -e 'ARGV.each { |f| YAML.load_file(f) }' .github/workflows/*.yml examples/*.yml

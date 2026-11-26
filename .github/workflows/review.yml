@@ -1,0 +1,69 @@
+name: pr-review
+
+# 各リポジトリのワークフローから uses: で呼ぶ、再利用のワークフロー。
+# 呼び出し方は examples/caller.yml を参照。
+on:
+  workflow_call:
+    inputs:
+      model:
+        description: レビューに使うモデル
+        type: string
+        default: claude-sonnet-5-5
+      max-diff-chars:
+        description: レビューに渡す差分の上限（文字数）。超えた分はレビューしない
+        type: number
+        default: 120000
+      max-tokens:
+        description: レビューの出力の上限（トークン）
+        type: number
+        default: 4000
+      skip-label:
+        description: このラベルが付いたPRはレビューしない
+        type: string
+        default: skip-review
+      pr-review-ref:
+        description: 使う pr-review のブランチやタグ
+        type: string
+        default: main
+    secrets:
+      ANTHROPIC_API_KEY:
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  review:
+    # 下書きのPR、フォークからのPR（シークレットが渡らない）、スキップのラベルが付いたPRは飛ばす
+    if: >-
+      github.event.pull_request.draft == false &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      !contains(github.event.pull_request.labels.*.name, inputs.skip-label)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      # REVIEW.md などは、PRで書き換えられた版ではなく、ベースのブランチの版を読む
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: target
+          persist-credentials: false
+      - uses: actions/checkout@v7
+        with:
+          repository: knk1313/pr-review
+          ref: ${{ inputs.pr-review-ref }}
+          path: .pr-review
+          persist-credentials: false
+      - name: レビューする
+        run: python3 .pr-review/scripts/review.py --target target
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GITHUB_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          MODEL: ${{ inputs.model }}
+          MAX_DIFF_CHARS: ${{ inputs.max-diff-chars }}
+          MAX_TOKENS: ${{ inputs.max-tokens }}
