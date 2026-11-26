@@ -286,7 +286,13 @@ def main() -> int:
         write_summary("レビューできる差分がないため、投稿しなかった。")
         return 0
 
-    result = call_claude(os.environ["ANTHROPIC_API_KEY"], args.model, args.max_tokens, system, user)
+    api_key = os.environ.get("ANTHROPIC_API_KEY", "").strip()
+    if not api_key:
+        raise SystemExit(
+            "ANTHROPIC_API_KEY が空である。対象のリポジトリの Settings > Secrets and variables > Actions の"
+            "「Repository secrets」に登録し、呼び出し側の secrets: で渡す"
+        )
+    result = call_claude(api_key, args.model, args.max_tokens, system, user)
     text = "".join(b.get("text", "") for b in result.get("content", []) if b.get("type") == "text").strip()
     if not text:
         raise SystemExit(f"Claude の応答が空だった：{json.dumps(result)[:500]}")
