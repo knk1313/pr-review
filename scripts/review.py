@@ -241,7 +241,7 @@ def main() -> int:
     ap.add_argument("--target", default=os.environ.get("TARGET_DIR", "."), help="対象のリポジトリを取り出したディレクトリ")
     ap.add_argument("--model", default=os.environ.get("MODEL") or "claude-sonnet-5-5")
     ap.add_argument("--max-diff-chars", type=int, default=int(os.environ.get("MAX_DIFF_CHARS") or 120_000))
-    ap.add_argument("--max-tokens", type=int, default=int(os.environ.get("MAX_TOKENS") or 4_000))
+    ap.add_argument("--max-tokens", type=int, default=int(os.environ.get("MAX_TOKENS") or 16_000))
     ap.add_argument("--dry-run", action="store_true", help="API を呼ばず、組み立てたプロンプトを表示する")
     ap.add_argument("--diff-file", help="--dry-run で使う差分のファイル。GitHub から取らない")
     args = ap.parse_args()
@@ -294,9 +294,14 @@ def main() -> int:
         )
     result = call_claude(api_key, args.model, args.max_tokens, system, user)
     text = "".join(b.get("text", "") for b in result.get("content", []) if b.get("type") == "text").strip()
+    stop = result.get("stop_reason")
     if not text:
-        raise SystemExit(f"Claude の応答が空だった：{json.dumps(result)[:500]}")
-    if result.get("stop_reason") == "max_tokens":
+        # 思考（thinking）も max_tokens を使うため、大きな差分では本文を書く前に上限に達することがある
+        hint = "max-tokens を上げる" if stop == "max_tokens" else "応答を確かめる"
+        raise SystemExit(
+            f"Claude の応答に本文がなかった（stop_reason={stop}、usage={json.dumps(result.get('usage', {}))}）。{hint}"
+        )
+    if stop == "max_tokens":
         text += "\n\n> 出力の上限に達したため、レビューが途中で切れている。"
 
     usage = result.get("usage", {})
