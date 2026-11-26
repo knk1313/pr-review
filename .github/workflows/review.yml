@@ -14,9 +14,9 @@ on:
         type: number
         default: 120000
       max-tokens:
-        description: レビューの出力の上限（トークン）
+        description: レビューの出力の上限（トークン）。モデルの思考の分も含む
         type: number
-        default: 4000
+        default: 16000
       skip-label:
         description: このラベルが付いたPRはレビューしない
         type: string
