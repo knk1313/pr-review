@@ -18,11 +18,11 @@ PRを開くたびに、差分をClaudeにレビューさせ、PRに1件のレビ
 
 ### 2. シークレットを登録する
 
-対象のリポジトリの「Settings > Secrets and variables > Actions」に、`ANTHROPIC_API_KEY`という名前でAPIキーを登録する。
+対象のリポジトリの「Settings > Secrets and variables > Actions」の「Repository secrets」に、`ANTHROPIC_API_KEY`という名前でAPIキーを登録する。「Environment secrets」は、ジョブに`environment:`を指定したときだけ渡るため、このワークフローでは使えない。
 
 ### 3. ワークフローを置く
 
-[examples/caller.yml](examples/caller.yml)を、対象のリポジトリの`.github/workflows/pr-review.yml`に写す。
+[examples/caller.yml](examples/caller.yml)を、対象のリポジトリの`.github/workflows/pr-review.yml`に写し、`<SHA>`をpr-reviewのコミットのSHAに置き換える。
 
 ```yaml
 jobs:
@@ -30,10 +30,14 @@ jobs:
     permissions:
       contents: read
       pull-requests: write
-    uses: knk1313/pr-review/.github/workflows/review.yml@main
+    uses: knk1313/pr-review/.github/workflows/review.yml@<SHA>
+    with:
+      pr-review-ref: <SHA>
     secrets:
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
 ```
+
+`uses:`のSHAで固定されるのはワークフローの定義だけである。ワークフローは、スクリプトを`pr-review-ref`の版で取り出す。両方に同じSHAを書かないと、スクリプトは`main`に追従する。
 
 ### 4. 確かめる
 
@@ -49,12 +53,12 @@ PRを開くと、数十秒でレビューが付く。初めて使うときは、
 | `max-diff-chars` | `120000` | レビューに渡す差分の上限（文字数）。超えた分はレビューせず、その旨をコメントに書く |
 | `max-tokens` | `4000` | レビューの出力の上限（トークン） |
 | `skip-label` | `skip-review` | このラベルが付いたPRはレビューしない |
-| `pr-review-ref` | `main` | 使うpr-reviewのブランチやタグ |
+| `pr-review-ref` | `main` | 取り出すpr-reviewのスクリプトの版。`uses:`で固定したSHAと同じ値を渡す |
 
 ## レビューしないもの
 
 - 下書きのPR。下書きを解除したときにレビューする
-- フォークからのPR。シークレットが渡らないため
+- フォークからのPRとDependabotのPR。シークレットが渡らないため
 - `skip-label`のラベルが付いたPR
 - ロックファイル、生成物、画像などのファイル。一覧は[scripts/review.py](scripts/review.py)の`EXCLUDE_PATTERNS`にある
 
@@ -63,6 +67,7 @@ PRを開くと、数十秒でレビューが付く。初めて使うときは、
 - `REVIEW.md`などの基準は、PRのブランチではなく、ベースのブランチの版を読む。PRで基準を緩めても、そのPRのレビューには効かない
 - PRの題名、説明、差分、コメントは、レビューする対象のデータとして渡す。そこに書かれた指示には従わないよう、モデルに伝えている
 - ワークフローの権限は、コードを読むこととPRにレビューを書くことだけにする
+- 呼び出し側は、ワークフローとスクリプトをコミットのSHAで固定する。pr-reviewの`main`が変わっても、APIキーと書き込みの権限を持つ処理が知らないうちに変わらない
 
 ## 手元で試す
 

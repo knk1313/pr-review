@@ -22,7 +22,7 @@ on:
         type: string
         default: skip-review
       pr-review-ref:
-        description: 使う pr-review のブランチやタグ
+        description: 取り出す pr-review のスクリプトの版。uses の行で固定した SHA と同じ値を渡す
         type: string
         default: main
     secrets:
@@ -34,10 +34,11 @@ permissions:
 
 jobs:
   review:
-    # 下書きのPR、フォークからのPR（シークレットが渡らない）、スキップのラベルが付いたPRは飛ばす
+    # 下書きのPR、フォークとDependabotのPR（シークレットが渡らない）、スキップのラベルが付いたPRは飛ばす
     if: >-
       github.event.pull_request.draft == false &&
       github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.user.login != 'dependabot[bot]' &&
       !contains(github.event.pull_request.labels.*.name, inputs.skip-label)
     runs-on: ubuntu-latest
     timeout-minutes: 10
